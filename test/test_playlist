@@ -1,0 +1,12 @@
+#!/bin/bash
+
+. "${BASH_SOURCE%/*}/funcs.sh"
+
+cmp -s - "$DIRNAME/playlist.m3u" <<END
+#EXTM3U
+#EXTINF:6,Barack Obama - The Internet [excerpt]
+obama.mp3
+ra[ven].mp3
+/music/random.mp3
+some.txt
+END

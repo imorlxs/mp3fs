@@ -31,6 +31,7 @@
 #include <sys/statvfs.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdint>
 #include <memory>
@@ -47,6 +48,83 @@
 namespace {
 
 constexpr int kBytesPerBlock = 512;
+
+bool is_playlist_path(const std::string& path) {
+    const std::string ext = ".m3u";
+    if (path.length() < ext.length()) {
+        return false;
+    }
+
+    return std::equal(ext.rbegin(), ext.rend(), path.rbegin(),
+                      [](char lhs, char rhs) {
+                          return tolower(lhs) == tolower(rhs);
+                      });
+}
+
+std::string convert_playlist_entry(const std::string& path) {
+    const size_t ext_pos = path.rfind('.');
+    const size_t slash_pos = path.rfind('/');
+    if (ext_pos == std::string::npos ||
+        (slash_pos != std::string::npos && ext_pos < slash_pos)) {
+        return path;
+    }
+
+    if (Decoder::CreateDecoder(path.substr(ext_pos + 1)) != nullptr) {
+        return path.substr(0, ext_pos + 1) + params.desttype;
+    }
+
+    return path;
+}
+
+std::string rewrite_playlist_paths(const std::string& playlist) {
+    std::string out;
+    out.reserve(playlist.size());
+
+    size_t line_start = 0;
+    while (line_start < playlist.size()) {
+        size_t line_end = playlist.find('\n', line_start);
+        if (line_end == std::string::npos) {
+            line_end = playlist.size();
+        }
+
+        std::string line = playlist.substr(line_start, line_end - line_start);
+        std::string cr;
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+            cr = "\r";
+        }
+        if (!line.empty() && line[0] != '#') {
+            line = convert_playlist_entry(line);
+        }
+
+        out += line + cr;
+        if (line_end != playlist.size()) {
+            out += "\n";
+        }
+
+        line_start = line_end + 1;
+    }
+
+    return out;
+}
+
+int read_rewritten_playlist(int fd, std::string* rewritten) {
+    rewritten->clear();
+    char buff[4096];
+    while (true) {
+        const ssize_t bytes = read(fd, buff, sizeof(buff));
+        if (bytes == 0) {
+            break;
+        }
+        if (bytes < 0) {
+            return -errno;
+        }
+        rewritten->append(buff, bytes);
+    }
+
+    *rewritten = rewrite_playlist_paths(*rewritten);
+    return 0;
+}
 
 /**
  * Convert file extension from source to destination name.
@@ -124,6 +202,23 @@ int mp3fs_getattr(const char* p, struct stat* stbuf) {
 
     /* pass-through for regular files */
     if (lstat(path.normal_source().c_str(), stbuf) == 0) {
+        if (S_ISREG(stbuf->st_mode) && is_playlist_path(p)) {
+            const int fd = open(path.normal_source().c_str(), O_RDONLY);
+            if (fd == -1) {
+                return -errno;
+            }
+
+            std::string rewritten;
+            const int ret = read_rewritten_playlist(fd, &rewritten);
+            close(fd);
+            if (ret != 0) {
+                return ret;
+            }
+
+            stbuf->st_size = static_cast<off_t>(rewritten.size());
+            stbuf->st_blocks =
+                (stbuf->st_size + kBytesPerBlock - 1) / kBytesPerBlock;
+        }
         return 0;
     }
 
@@ -155,6 +250,19 @@ int mp3fs_open(const char* p, struct fuse_file_info* fi) {
     const int fd = open(path.normal_source().c_str(), fi->flags);
 
     if (fd != -1) {  // File exists and was successfully opened.
+        if (is_playlist_path(p)) {
+            std::string rewritten;
+            const int ret = read_rewritten_playlist(fd, &rewritten);
+            close(fd);
+            if (ret != 0) {
+                return ret;
+            }
+
+            fi->fh = reinterpret_cast<uint64_t>(
+                new MemoryReader(std::move(rewritten)));
+            return 0;
+        }
+
         fi->fh = reinterpret_cast<uint64_t>(new FileReader(fd));
         return 0;
     }

@@ -21,6 +21,10 @@
 #ifndef MP3FS_READER_H_
 #define MP3FS_READER_H_
 
+#include <algorithm>
+#include <cstring>
+#include <string>
+
 #include <unistd.h>
 
 class Reader {
@@ -43,6 +47,26 @@ class FileReader : public Reader {
 
  private:
     int fd_;
+};
+
+class MemoryReader : public Reader {
+ public:
+    explicit MemoryReader(std::string data) : data_(std::move(data)) {}
+
+    ssize_t read(char* buff, off_t offset, size_t len) override {
+        if (offset < 0 ||
+            static_cast<size_t>(offset) >= static_cast<size_t>(data_.size())) {
+            return 0;
+        }
+
+        const size_t remaining = data_.size() - static_cast<size_t>(offset);
+        const size_t bytes = std::min(len, remaining);
+        memcpy(buff, data_.data() + offset, bytes);
+        return static_cast<ssize_t>(bytes);
+    }
+
+ private:
+    std::string data_;
 };
 
 #endif  // MP3FS_READER_H_
