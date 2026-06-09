@@ -50,17 +50,22 @@ namespace {
 
 constexpr int kBytesPerBlock = 512;
 
+bool has_supported_decoder_extension(const std::string& extension) {
+    const std::unique_ptr<Decoder> decoder(Decoder::CreateDecoder(extension));
+    return decoder != nullptr;
+}
+
 bool is_playlist_path(const std::string& path) {
     const std::string ext = ".m3u";
     if (path.length() < ext.length()) {
         return false;
     }
 
-    return std::equal(ext.rbegin(), ext.rend(), path.rbegin(),
-                      [](char lhs, char rhs) {
-                          return tolower(static_cast<unsigned char>(lhs)) ==
-                                 tolower(static_cast<unsigned char>(rhs));
-                      });
+    return std::equal(
+        ext.rbegin(), ext.rend(), path.rbegin(), [](char lhs, char rhs) {
+            return std::tolower(static_cast<unsigned char>(lhs)) ==
+                   std::tolower(static_cast<unsigned char>(rhs));
+        });
 }
 
 std::string convert_playlist_entry(const std::string& path) {
@@ -71,7 +76,7 @@ std::string convert_playlist_entry(const std::string& path) {
         return path;
     }
 
-    if (Decoder::CreateDecoder(path.substr(ext_pos + 1)) != nullptr) {
+    if (has_supported_decoder_extension(path.substr(ext_pos + 1))) {
         return path.substr(0, ext_pos + 1) + params.desttype;
     }
 
@@ -135,7 +140,7 @@ std::string convert_extension(const std::string& path) {
     const size_t ext_pos = path.rfind('.');
 
     if (ext_pos != std::string::npos &&
-        Decoder::CreateDecoder(path.substr(ext_pos + 1)) != nullptr) {
+        has_supported_decoder_extension(path.substr(ext_pos + 1))) {
         return path.substr(0, ext_pos + 1) + params.desttype;
     }
 
