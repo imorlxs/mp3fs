@@ -32,6 +32,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cstdint>
 #include <memory>
@@ -57,7 +58,8 @@ bool is_playlist_path(const std::string& path) {
 
     return std::equal(ext.rbegin(), ext.rend(), path.rbegin(),
                       [](char lhs, char rhs) {
-                          return tolower(lhs) == tolower(rhs);
+                          return tolower(static_cast<unsigned char>(lhs)) ==
+                                 tolower(static_cast<unsigned char>(rhs));
                       });
 }
 

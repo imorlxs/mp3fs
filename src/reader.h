@@ -21,11 +21,11 @@
 #ifndef MP3FS_READER_H_
 #define MP3FS_READER_H_
 
+#include <unistd.h>
+
 #include <algorithm>
 #include <cstring>
 #include <string>
-
-#include <unistd.h>
 
 class Reader {
  public:
