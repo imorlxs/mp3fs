@@ -49,6 +49,7 @@
 namespace {
 
 constexpr int kBytesPerBlock = 512;
+constexpr char kPlaylistExtension[] = ".m3u";
 
 bool has_supported_decoder_extension(const std::string& extension) {
     const std::unique_ptr<Decoder> decoder(Decoder::CreateDecoder(extension));
@@ -56,7 +57,7 @@ bool has_supported_decoder_extension(const std::string& extension) {
 }
 
 bool is_playlist_path(const std::string& path) {
-    const std::string ext = ".m3u";
+    const std::string ext = kPlaylistExtension;
     if (path.length() < ext.length()) {
         return false;
     }
