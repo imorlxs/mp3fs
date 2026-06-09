@@ -77,7 +77,8 @@ std::string convert_playlist_entry(const std::string& path) {
         return path;
     }
 
-    if (has_supported_decoder_extension(path.substr(ext_pos + 1))) {
+    const std::string ext = path.substr(ext_pos + 1);
+    if (has_supported_decoder_extension(ext)) {
         return path.substr(0, ext_pos + 1) + params.desttype;
     }
 
@@ -132,6 +133,18 @@ int read_rewritten_playlist(int fd, std::string* rewritten) {
 
     *rewritten = rewrite_playlist_paths(*rewritten);
     return 0;
+}
+
+int read_rewritten_playlist_from_source(const std::string& source,
+                                        std::string* rewritten) {
+    const int fd = open(source.c_str(), O_RDONLY);
+    if (fd == -1) {
+        return -errno;
+    }
+
+    const int ret = read_rewritten_playlist(fd, rewritten);
+    close(fd);
+    return ret;
 }
 
 /**
@@ -211,14 +224,9 @@ int mp3fs_getattr(const char* p, struct stat* stbuf) {
     /* pass-through for regular files */
     if (lstat(path.normal_source().c_str(), stbuf) == 0) {
         if (S_ISREG(stbuf->st_mode) && is_playlist_path(p)) {
-            const int fd = open(path.normal_source().c_str(), O_RDONLY);
-            if (fd == -1) {
-                return -errno;
-            }
-
             std::string rewritten;
-            const int ret = read_rewritten_playlist(fd, &rewritten);
-            close(fd);
+            const int ret = read_rewritten_playlist_from_source(
+                path.normal_source(), &rewritten);
             if (ret != 0) {
                 return ret;
             }

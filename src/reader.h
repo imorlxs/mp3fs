@@ -54,8 +54,7 @@ class MemoryReader : public Reader {
     explicit MemoryReader(std::string data) : data_(std::move(data)) {}
 
     ssize_t read(char* buff, off_t offset, size_t len) override {
-        if (offset < 0 ||
-            static_cast<size_t>(offset) >= static_cast<size_t>(data_.size())) {
+        if (offset < 0 || static_cast<size_t>(offset) >= data_.size()) {
             return 0;
         }
 
